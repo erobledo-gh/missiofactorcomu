@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Factor Comú — Missió Espacial</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg0:#04060f; --bg1:#080d1e; --surface:#0d1428; --card:#111a35;
+  --border:#1e2d55; --accent:#00d4ff; --yellow:#ffd700; --green:#00ff88;
+  --red:#ff3d5a; --orange:#ff8c00; --muted:#3a5080; --text:#c8deff;
+}
+body { background:var(--bg0); font-family:'Space Mono',monospace; color:var(--text); min-height:100vh; overflow-x:hidden; }
+.stars { position:fixed; inset:0; pointer-events:none; z-index:0; overflow:hidden; }
+.star  { position:absolute; border-radius:50%; background:white; animation:twinkle var(--d) ease-in-out infinite alternate; }
+@keyframes twinkle { from{opacity:var(--a);transform:scale(1)} to{opacity:calc(var(--a)*0.2);transform:scale(0.7)} }
+
+.app {
+  position:relative; z-index:1;
+  display:grid; grid-template-columns:220px 1fr; grid-template-rows:auto 1fr;
+  min-height:100vh; max-width:1100px; margin:0 auto;
+}
+.top-bar {
+  grid-column:1/-1; padding:18px 28px 14px;
+  display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg,#0a102280 0%,transparent 100%);
+}
+.logo { font-family:'Orbitron',monospace; font-size:1.1rem; font-weight:900; color:var(--accent); letter-spacing:.12em; text-shadow:0 0 20px #00d4ff88; }
+.logo span { color:var(--yellow); }
+.mission-tag { font-size:.6rem; color:var(--muted); text-transform:uppercase; letter-spacing:.2em; }
+
+/* Sidebar */
+.sidebar { padding:20px 12px; border-right:1px solid var(--border); display:flex; flex-direction:column; align-items:center; position:relative; overflow-y:auto; }
+.path-title { font-family:'Orbitron',monospace; font-size:.58rem; color:var(--muted); text-transform:uppercase; letter-spacing:.18em; margin-bottom:16px; }
+.path-wrap { display:flex; flex-direction:column-reverse; align-items:center; gap:0; width:100%; }
+.step-node { display:flex; flex-direction:column; align-items:center; width:100%; }
+.step-connector { width:2px; height:22px; background:var(--border); transition:background .4s; }
+.step-connector.done   { background:var(--green); }
+.step-connector.active { background:var(--accent); animation:pulse-line 1.2s ease-in-out infinite; }
+@keyframes pulse-line { 0%,100%{opacity:1} 50%{opacity:.3} }
+.step-circle {
+  width:42px; height:42px; border-radius:50%; border:2px solid var(--border);
+  background:var(--surface); display:flex; align-items:center; justify-content:center;
+  font-size:.75rem; font-weight:700; color:var(--muted);
+  transition:all .35s cubic-bezier(.34,1.56,.64,1);
+}
+.step-circle.done   { border-color:var(--green);  color:var(--green);  background:#00ff8815; box-shadow:0 0 14px #00ff8840; }
+.step-circle.active { border-color:var(--accent); color:var(--accent); background:#00d4ff15; box-shadow:0 0 18px #00d4ff60; transform:scale(1.15); animation:breathe 1.8s ease-in-out infinite; }
+@keyframes breathe { 0%,100%{box-shadow:0 0 18px #00d4ff60} 50%{box-shadow:0 0 32px #00d4ffaa} }
+.step-circle.locked { opacity:.3; }
+@keyframes errFlash { 0%,100%{border-color:var(--border)} 30%,70%{border-color:var(--red);box-shadow:0 0 20px #ff3d5a80;background:#ff3d5a15} }
+.step-emoji { font-size:1rem; }
+.step-label { font-size:.5rem; color:var(--muted); text-align:center; margin-top:2px; max-width:72px; line-height:1.3; transition:color .3s; }
+.step-label.active { color:var(--accent); }
+.step-label.done   { color:var(--green); }
+.rocket-wrap {
+  position:absolute; left:50%; transform:translateX(-50%);
+  transition:top 1.1s cubic-bezier(.4,0,.2,1);
+  pointer-events:none; z-index:10;
+}
+.rocket {
+  font-size:1.6rem;
+  filter:drop-shadow(0 0 8px #00d4ff);
+  transition:transform 0.4s ease;
+  display:inline-block;
+}
+.rocket.going-up   { transform: rotate(-30deg); animation:thrustUp 2s ease-in-out infinite; }
+.rocket.going-down { transform: rotate(150deg); animation:thrustDown 2s ease-in-out infinite; }
+@keyframes thrustUp   { 0%,100%{filter:drop-shadow(0 0 8px #00d4ff) drop-shadow(0 4px 8px #00d4ff88)} 50%{filter:drop-shadow(0 0 16px #00d4ff) drop-shadow(0 6px 14px #00d4ffcc)} }
+@keyframes thrustDown { 0%,100%{filter:drop-shadow(0 0 8px #ff3d5a) drop-shadow(0 -4px 8px #ff3d5a88)} 50%{filter:drop-shadow(0 0 16px #ff3d5a) drop-shadow(0 -6px 14px #ff3d5acc)} }
+
+/* Main */
+.main { padding:24px 28px; display:flex; flex-direction:column; gap:18px; }
+.challenge-header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.challenge-name { font-family:'Orbitron',monospace; font-size:.95rem; font-weight:700; color:var(--yellow); text-shadow:0 0 12px #ffd70066; }
+.challenge-sub { font-size:.58rem; color:var(--muted); text-transform:uppercase; letter-spacing:.15em; margin-top:2px; }
+.progress-pills { display:flex; gap:4px; flex-wrap:wrap; max-width:200px; }
+.pp { width:10px; height:10px; border-radius:50%; background:var(--border); transition:all .3s; }
+.pp.done   { background:var(--green); box-shadow:0 0 6px var(--green); }
+.pp.active { background:var(--accent); box-shadow:0 0 6px var(--accent); }
+
+.poly-display { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px 24px; text-align:center; position:relative; overflow:hidden; }
+.poly-display::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse 60% 60% at 50% 0%,#00d4ff08 0%,transparent 70%); }
+.poly-label { font-size:.58rem; color:var(--muted); text-transform:uppercase; letter-spacing:.18em; margin-bottom:10px; }
+.poly-expr { font-family:'Orbitron',monospace; font-size:clamp(1.2rem,3.5vw,1.8rem); font-weight:700; color:var(--text); letter-spacing:.04em; }
+.poly-expr .tc-pos { color:var(--yellow); }
+.poly-expr .tc-neg { color:#ff9966; }
+.poly-expr .op     { color:var(--muted); margin:0 4px; }
+
+.bank-wrap { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px 16px; }
+.bank { display:flex; flex-wrap:wrap; gap:8px; min-height:44px; }
+
+.piece {
+  padding:7px 13px; border-radius:8px; border:1.5px solid var(--accent);
+  background:#00d4ff0d; color:var(--accent); font-family:'Orbitron',monospace;
+  font-size:.82rem; font-weight:700; cursor:grab; user-select:none;
+  transition:all .12s; touch-action:none;
+}
+.piece:hover { background:#00d4ff20; transform:translateY(-2px); box-shadow:0 4px 14px #00d4ff30; }
+.piece.dragging { opacity:.35; cursor:grabbing; }
+.piece.placed   { border-color:var(--yellow); background:#ffd7000d; color:var(--yellow); }
+.piece.correct  { border-color:var(--green)!important; background:#00ff8815!important; color:var(--green)!important; animation:popIn .3s ease; }
+.piece.wrong    { border-color:var(--red)!important; background:#ff3d5a15!important; color:var(--red)!important; animation:shake .35s ease; }
+/* sign pieces get a softer tint */
+.piece.sign-piece { font-size:1.1rem; padding:7px 11px; border-color:#ffffff30; background:#ffffff07; color:#aabbcc; }
+
+@keyframes popIn { 0%{transform:scale(.8)} 60%{transform:scale(1.1)} 100%{transform:scale(1)} }
+@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-5px)} 40%{transform:translateX(5px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+
+.zones-row { display:grid; grid-template-columns:1fr 40px 1fr; align-items:end; gap:6px; }
+.zone-block { display:flex; flex-direction:column; gap:5px; }
+.zone-label { font-size:.53rem; color:var(--muted); text-transform:uppercase; letter-spacing:.14em; }
+.drop-zone {
+  min-height:56px; border-radius:10px; border:2px dashed var(--border);
+  background:var(--surface); display:flex; flex-wrap:wrap; align-items:center;
+  justify-content:center; gap:4px; padding:8px; transition:all .15s;
+}
+.drop-zone.dragover       { border-color:var(--accent); background:#00d4ff0d; box-shadow:0 0 18px #00d4ff30; }
+.drop-zone.correct-zone   { border-color:var(--green);  border-style:solid; background:#00ff8808; }
+.drop-zone.wrong-zone     { border-color:var(--red);    border-style:solid; background:#ff3d5a08; }
+.placeholder { font-size:.62rem; color:var(--muted); pointer-events:none; }
+.zone-sep { font-family:'Orbitron',monospace; font-size:1.8rem; color:var(--muted); text-align:center; line-height:1; padding-bottom:10px; }
+.close-paren { text-align:right; font-family:'Orbitron',monospace; font-size:1.4rem; color:var(--muted); padding-right:2px; margin-top:-4px; }
+
+.verify-btn {
+  width:100%; padding:14px; border-radius:12px; border:1.5px solid var(--accent);
+  background:transparent; color:var(--accent); font-family:'Orbitron',monospace;
+  font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.12em;
+  cursor:pointer; transition:all .15s;
+}
+.verify-btn:hover    { background:#00d4ff15; box-shadow:0 0 20px #00d4ff40; }
+.verify-btn:disabled { opacity:.3; cursor:not-allowed; }
+
+.feedback { display:none; border-radius:12px; padding:14px 18px; font-size:.78rem; animation:fadeUp .3s ease forwards; }
+.feedback.ok  { display:block; background:#00ff8812; border:1px solid #00ff8840; color:var(--green); }
+.feedback.err { display:block; background:#ff3d5a12; border:1px solid #ff3d5a40; color:var(--red); }
+.feedback .fb-title { font-family:'Orbitron',monospace; font-size:.63rem; letter-spacing:.12em; margin-bottom:4px; opacity:.8; }
+.feedback .fb-ans   { font-family:'Orbitron',monospace; font-size:.88rem; font-weight:700; margin-top:6px; color:var(--text); }
+@keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+.win-screen { display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:40px 20px; text-align:center; animation:fadeUp .6s ease forwards; }
+.win-screen.visible { display:flex; }
+.win-rocket { font-size:5rem; animation:launch 1.2s ease forwards; }
+@keyframes launch { 0%{transform:translateY(0)} 100%{transform:translateY(-30px)} }
+.win-title { font-family:'Orbitron',monospace; font-size:clamp(1.4rem,4vw,2rem); font-weight:900; color:var(--yellow); text-shadow:0 0 30px #ffd70088; }
+.win-sub { font-size:.72rem; color:var(--muted); line-height:1.8; }
+.restart-btn { margin-top:8px; padding:14px 30px; border-radius:12px; border:1.5px solid var(--yellow); background:transparent; color:var(--yellow); font-family:'Orbitron',monospace; font-size:.72rem; font-weight:700; letter-spacing:.1em; cursor:pointer; transition:all .15s; }
+.restart-btn:hover { background:#ffd70015; box-shadow:0 0 20px #ffd70040; }
+
+#dragGhost { position:fixed; pointer-events:none; z-index:9999; padding:7px 13px; border-radius:8px; border:1.5px solid var(--accent); background:#00d4ff20; color:var(--accent); font-family:'Orbitron',monospace; font-size:.82rem; font-weight:700; transform:translate(-50%,-50%) rotate(4deg); opacity:0; transition:opacity .1s; white-space:nowrap; }
+
+.start-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:40px 20px; text-align:center; }
+.start-screen .big-rocket { font-size:4rem; animation:rocketFloat 2s ease-in-out infinite; }
+.start-title { font-family:'Orbitron',monospace; font-size:clamp(1.2rem,3vw,1.7rem); font-weight:900; color:var(--accent); text-shadow:0 0 20px #00d4ff66; }
+.start-desc { font-size:.7rem; color:var(--muted); line-height:1.9; max-width:380px; }
+.start-btn { padding:15px 38px; border-radius:14px; border:none; background:var(--accent); color:var(--bg0); font-family:'Orbitron',monospace; font-size:.8rem; font-weight:900; letter-spacing:.12em; cursor:pointer; transition:all .15s; margin-top:4px; }
+.start-btn:hover { transform:translateY(-2px); box-shadow:0 0 28px #00d4ff88; }
+
+@media (max-width:640px) {
+  .app { grid-template-columns:1fr; grid-template-rows:auto auto 1fr; }
+  .sidebar { flex-direction:row; border-right:none; border-bottom:1px solid var(--border); padding:10px 12px; overflow-x:auto; }
+  .path-wrap { flex-direction:row; align-items:center; }
+  .step-connector { width:16px; height:2px; }
+  .step-node { flex-direction:row; width:auto; }
+  .step-label,.path-title,.rocket-wrap { display:none; }
+  .main { padding:14px; }
+}
+</style>
+</head>
+<body>
+<div class="stars" id="stars"></div>
+<div id="dragGhost"></div>
+
+<div class="app">
+  <div class="top-bar">
+    <div>
+      <div class="logo">FACTOR<span>COMÚ</span></div>
+      <div class="mission-tag">Terra → Plutó · factoritza i conquereix el sistema solar</div>
+    </div>
+    <div id="topProgress" style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;max-width:240px"></div>
+  </div>
+
+  <div class="sidebar" id="sidebar">
+    <div class="path-title">Ruta</div>
+    <div class="path-wrap" id="pathWrap"></div>
+    <div class="rocket-wrap" id="rocketWrap"><div class="rocket">🚀</div></div>
+  </div>
+
+  <div class="main" id="mainArea">
+    <div class="start-screen" id="startScreen">
+      <div class="big-rocket">🚀</div>
+      <div class="start-title">Missió Factor Comú</div>
+
+      <div class="start-desc" style="text-align:left;max-width:420px">
+        <div style="color:var(--accent);font-family:'Orbitron',monospace;font-size:.65rem;letter-spacing:.15em;margin-bottom:10px;text-transform:uppercase">🎯 Objectiu</div>
+        Treure el factor comú correctament a cada polinomi.
+        <br><br>
+        <div style="color:var(--accent);font-family:'Orbitron',monospace;font-size:.65rem;letter-spacing:.15em;margin-bottom:10px;text-transform:uppercase">⚠️ Important</div>
+        Si el factor comú coincideix exactament amb un dels sumands, al parèntesi hi queda la <strong style="color:var(--yellow)">unitat (1)</strong>. No l'oblidis!
+        <br><br><br><br>
+        <div style="background:#00d4ff0d;border:1px solid #00d4ff30;border-radius:8px;padding:10px 14px;font-size:.68rem;line-height:1.8">
+          ✅ Encerta → avances un planeta<br>
+          ❌ Error → retrocedeixos un planeta<br>
+          🏁 Arriba a <strong style="color:var(--yellow)">Plutó</strong> per completar la missió!
+        </div>
+      </div>
+
+      <button class="start-btn" onclick="startMission()">⚡ INICIAR MISSIÓ</button>
+    </div>
+
+    <div id="exerciseArea" style="display:none;flex-direction:column;gap:16px;">
+      <div class="challenge-header">
+        <div>
+          <div class="challenge-name" id="challengeName"></div>
+          <div class="challenge-sub" id="challengeSub"></div>
+        </div>
+        <div class="progress-pills" id="progressPills"></div>
+      </div>
+
+      <div class="poly-display">
+        <div class="poly-label">Factoritza aquest polinomi</div>
+        <div class="poly-expr" id="polyExpr"></div>
+      </div>
+
+      <div class="bank-wrap">
+        <div style="font-size:.56rem;color:var(--muted);text-transform:uppercase;letter-spacing:.15em;margin-bottom:9px">Peces disponibles — arrossega-les a la seva posició</div>
+        <div class="bank" id="bank"></div>
+      </div>
+
+      <div>
+        <div style="font-size:.53rem;color:var(--muted);text-transform:uppercase;letter-spacing:.14em;margin-bottom:7px">Construeix: FC · ( terme ± terme … )</div>
+        <div class="zones-row">
+          <div class="zone-block">
+            <div class="zone-label">Factor comú</div>
+            <div class="drop-zone" id="zoneFC"><span class="placeholder">FC</span></div>
+          </div>
+          <div class="zone-sep">·(</div>
+          <div class="zone-block">
+            <div class="zone-label">Termes parèntesi</div>
+            <div class="drop-zone" id="zoneTerms"><span class="placeholder">t ± t …</span></div>
+          </div>
+        </div>
+        <div class="close-paren">)</div>
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <button class="verify-btn" id="verifyBtn" onclick="verify()" style="flex:2">⚡ VERIFICAR</button>
+        <button class="verify-btn" id="hintBtn" onclick="toggleHint()"
+          style="flex:1;display:none;border-color:#ffd700;color:#ffd700">💡 PISTA</button>
+      </div>
+      <div id="hintBox" style="display:none;border-radius:12px;padding:14px 18px;background:#ffd70010;border:1px solid #ffd70040;font-size:.78rem;animation:fadeUp .3s ease forwards">
+        <div style="font-family:'Orbitron',monospace;font-size:.6rem;color:#ffd700;letter-spacing:.12em;margin-bottom:8px">💡 PISTA</div>
+        <div id="hintContent" style="color:var(--text);line-height:1.8"></div>
+      </div>
+      <div class="feedback" id="feedback">
+        <div class="fb-title" id="fbTitle"></div>
+        <div id="fbMsg"></div>
+        <div class="fb-ans" id="fbAns"></div>
+        <button id="continueBtn" onclick="doContinue()"
+          style="display:none;margin-top:12px;width:100%;padding:11px;border-radius:10px;border:1.5px solid currentColor;background:transparent;color:inherit;font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;opacity:.9;">
+          CONTINUAR →
+        </button>
+      </div>
+    </div>
+
+    <div class="win-screen" id="winScreen">
+      <div class="win-rocket">🚀</div>
+      <div class="win-title">PLUTÓ CONQUERIT!</div>
+      <div class="win-sub">Has completat els 8 reptes del sistema solar.<br>El factor comú és la teva superpotència. ❄️⭐🌌</div>
+      <button class="restart-btn" onclick="restartMission()">↺ NOVA MISSIÓ</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Stars
+(function(){
+  const w=document.getElementById('stars');
+  for(let i=0;i<160;i++){
+    const s=document.createElement('div'); s.className='star';
+    const sz=Math.random()*2.2+0.4;
+    s.style.cssText=`width:${sz}px;height:${sz}px;left:${Math.random()*100}%;top:${Math.random()*100}%;--a:${(Math.random()*.7+.2).toFixed(2)};--d:${(Math.random()*3+1.5).toFixed(1)}s;animation-delay:${(Math.random()*3).toFixed(1)}s`;
+    w.appendChild(s);
+  }
+})();
+
+// STEPS: Terra → Plutó (8 passos)
+const STEPS = [
+  { id:1, emoji:'🌍', label:'Terra',   type:'numeric', nTerms:2, fcRange:[2,4],  coefRange:[1,5],  negProb:0   },
+  { id:2, emoji:'🌙', label:'Lluna',   type:'numeric', nTerms:3, fcRange:[2,5],  coefRange:[1,5],  negProb:0.3 },
+  { id:3, emoji:'☄️', label:'Cometa',  type:'letter',  nTerms:2, fcRange:[1,1],  coefRange:[1,6],  negProb:0   },
+  { id:4, emoji:'🔴', label:'Mart',    type:'letter',  nTerms:3, fcRange:[1,2],  coefRange:[1,6],  negProb:0.3 },
+  { id:5, emoji:'🪐', label:'Júpiter', type:'mixed',   nTerms:2, fcRange:[2,4],  coefRange:[2,7],  negProb:0.4 },
+  { id:6, emoji:'💎', label:'Urà',     type:'mixed',   nTerms:3, fcRange:[2,5],  coefRange:[2,8],  negProb:0.5 },
+  { id:7, emoji:'🌀', label:'Neptú',   type:'mixed',   nTerms:3, fcRange:[3,6],  coefRange:[3,10], negProb:0.6 },
+  { id:8, emoji:'❄️', label:'Plutó',   type:'mixed',   nTerms:3, fcRange:[4,8],  coefRange:[3,12], negProb:0.7 },
+];
+
+let currentStep=0, currentEx=null, missionStarted=false;
+let dragPiece=null, dragOrigin=null, touchPiece=null, touchOrigin=null;
+
+// Math helpers
+function gcd(a,b){a=Math.abs(a);b=Math.abs(b);while(b){[a,b]=[b,a%b];}return a;}
+function randInt(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
+function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
+function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function sup(n){const m={'2':'²','3':'³','4':'⁴','5':'⁵','0':'⁰','1':'¹'};return String(n).split('').map(c=>m[c]||c).join('');}
+
+// Format monomial (always positive coef here)
+function monoStr(coef,exp){
+  if(exp===0) return String(coef);
+  if(coef===1&&exp===1) return 'x';
+  if(coef===1) return 'x'+sup(exp);
+  if(exp===1) return coef+'x';
+  return coef+'x'+sup(exp);
+}
+
+// A "signed term" piece label: "+3x²" or "-5" or "+1"
+function signedLabel(sign, coef, exp){
+  return (sign>0?'+':'-') + monoStr(coef, exp);
+}
+
+// Generate exercise
+// Strategy: generate FC + inner terms where inner coefs are COPRIME with each other
+// (so the FC we pick is genuinely the MAXIMUM common factor).
+// Also: if an inner coef is 1, the piece label will be "1" (or "+1"/"-1") — the unit case.
+function generateFor(step){
+  const cfg = STEPS[step];
+
+  // ── 1. Decide FC ──────────────────────────────────────────────────────────
+  let fcCoef, fcExp;
+  if(cfg.type==='numeric'){
+    fcCoef = randInt(cfg.fcRange[0], cfg.fcRange[1]);
+    fcExp  = 0;
+  } else if(cfg.type==='letter'){
+    fcCoef = randInt(cfg.fcRange[0], cfg.fcRange[1]);
+    fcExp  = randInt(1, 2);
+  } else { // mixed
+    fcCoef = randInt(cfg.fcRange[0], cfg.fcRange[1]);
+    fcExp  = randInt(1, 2);
+  }
+  const fc = {coef: fcCoef, exp: fcExp};
+
+  // ── 2. Generate inner terms with coefs that are COPRIME pair-by-pair ──────
+  // We pick inner coefs such that gcd(allInnerCoefs) = 1,
+  // which ensures fcCoef is truly the full numeric FC.
+  // Technique: pick the first coef freely, then ensure at least one coef is
+  // NOT divisible by any prime factor of fcCoef, so no extra common factor exists.
+  const n = cfg.nTerms;
+
+  // Decide exponents for inner terms (variable part inside parenthesis)
+  let innerExps;
+  if(cfg.type==='numeric'){
+    const hasVar = Math.random() < 0.6;
+    innerExps = hasVar
+      ? (n===2 ? [1,0] : [2,1,0])
+      : Array(n).fill(0);
+  } else {
+    // letter / mixed: descending exps, last one always 0 (gives the "1" unit case)
+    innerExps = Array.from({length:n},(_,i)=> n===2 ? (i===0?randInt(1,2):0) : (i===0?2:i===1?1:0));
+  }
+
+  // Generate inner coefs: guarantee overall gcd = 1 (so FC is maximal)
+  function genCoprimeCoefsTo(target, count, range){
+    // target: the fcCoef whose prime factors must NOT all appear in every inner coef
+    // We ensure gcd of all inner coefs is 1 (no shared factor on top of FC)
+    let coefs;
+    let attempts = 0;
+    do {
+      coefs = Array.from({length:count}, ()=> randInt(range[0], range[1]));
+      attempts++;
+    } while(attempts < 40 && coefs.reduce((a,b)=>gcd(a,b)) > 1);
+    return coefs;
+  }
+
+  const innerCoefs = genCoprimeCoefsTo(fcCoef, n, cfg.coefRange);
+
+  // ── 3. Assign signs ────────────────────────────────────────────────────────
+  const innerTerms = innerCoefs.map((c,i)=>({
+    coef: c,
+    exp:  innerExps[i],
+    sign: (i>0 && Math.random()<cfg.negProb) ? -1 : 1
+  }));
+  innerTerms[0].sign = 1; // first term always positive
+
+  // ── 4. Build the polynomial terms (= fc × inner) ──────────────────────────
+  const terms = innerTerms.map(t=>({
+    coef: fcCoef * t.coef,
+    exp:  fcExp  + t.exp,
+    sign: t.sign
+  }));
+
+  // ── 5. Labels ─────────────────────────────────────────────────────────────
+  const fcLabel = monoStr(fc.coef, fc.exp);
+
+  // Inner labels: first has no sign prefix; rest have +/-
+  // coef=1 with exp=0 → "1", with sign → "+1" or "-1"  (the unit case!)
+  const innerLabels = innerTerms.map((t,i) => {
+    if(i===0) return monoStr(t.coef, t.exp);
+    return signedLabel(t.sign, t.coef, t.exp);
+  });
+
+  // ── 6. Distractors ────────────────────────────────────────────────────────
+  const used = new Set([fcLabel, ...innerLabels]);
+  const bad  = [];
+  const tryD = (lbl) => { if(lbl && !used.has(lbl)){used.add(lbl);bad.push(lbl);} };
+
+  // Wrong FC: neighbour coefs or wrong exponent
+  if(fc.coef>1) tryD(monoStr(fc.coef-1, fc.exp));
+  tryD(monoStr(fc.coef+1, fc.exp));
+  if(fc.exp>0)  tryD(monoStr(fc.coef,   fc.exp-1));
+  tryD(monoStr(fc.coef,   fc.exp+1));
+
+  // Wrong inner terms
+  innerTerms.forEach((t,i)=>{
+    if(i===0){
+      tryD(monoStr(t.coef+1, t.exp));
+      if(t.coef>1) tryD(monoStr(t.coef-1, t.exp));
+      if(t.exp>0) tryD(monoStr(t.coef, t.exp+1));
+    } else {
+      tryD(signedLabel(t.sign,  t.coef+1, t.exp));
+      tryD(signedLabel(-t.sign, t.coef,   t.exp));   // wrong sign — good trap!
+      if(t.coef>1) tryD(signedLabel(t.sign, t.coef-1, t.exp));
+      if(t.exp>0)  tryD(signedLabel(t.sign, t.coef,   t.exp+1));
+    }
+  });
+
+  const distractors = shuffle(bad).slice(0,3).map(l=>({label:l,correct:false}));
+  const correct = [{label:fcLabel,correct:true}, ...innerLabels.map(l=>({label:l,correct:true}))];
+  const allPieces = shuffle([...correct,...distractors]);
+
+  const answerStr = `${fcLabel} · ( ${innerLabels.join(' ')} )`;
+
+  return {terms, fc, fcLabel, innerTerms, innerLabels, allPieces, answerStr};
+}
+
+// Path UI
+function buildPath(){
+  const wrap = document.getElementById('pathWrap');
+  wrap.innerHTML='';
+  STEPS.forEach((s,i)=>{
+    const node=document.createElement('div'); node.className='step-node'; node.id='node-'+i;
+    if(i<STEPS.length-1){const conn=document.createElement('div');conn.className='step-connector';conn.id='conn-'+i;node.appendChild(conn);}
+    const circle=document.createElement('div'); circle.className='step-circle locked'; circle.id='circle-'+i;
+    circle.innerHTML=`<span class="step-emoji">${s.emoji}</span>`;
+    node.appendChild(circle);
+    const lbl=document.createElement('div'); lbl.className='step-label'; lbl.id='label-'+i; lbl.textContent=s.label;
+    node.appendChild(lbl);
+    wrap.appendChild(node);
+  });
+  // Don't call updatePath here; loadStep will do it
+}
+
+function updatePath(direction){
+  STEPS.forEach((_,i)=>{
+    const circle=document.getElementById('circle-'+i);
+    const label =document.getElementById('label-'+i);
+    const conn  =document.getElementById('conn-'+i);
+    circle.className='step-circle'; label.className='step-label';
+    if(conn) conn.className='step-connector';
+    if(i<currentStep){circle.classList.add('done');label.classList.add('done');if(conn)conn.classList.add('done');}
+    else if(i===currentStep){circle.classList.add('active');label.classList.add('active');if(conn)conn.classList.add('active');}
+    else{circle.classList.add('locked');}
+  });
+  positionRocket(direction);
+}
+
+function positionRocket(direction){
+  if(window.innerWidth<=640) return;
+  const sidebar=document.getElementById('sidebar');
+  const active =document.getElementById('circle-'+currentStep);
+  if(!active) return;
+  const sr=sidebar.getBoundingClientRect(), cr=active.getBoundingClientRect();
+  const rocketWrap=document.getElementById('rocketWrap');
+  const rocketEl  =rocketWrap.querySelector('.rocket');
+
+  // Set direction class before moving
+  if(direction==='up'){
+    rocketEl.classList.remove('going-down');
+    rocketEl.classList.add('going-up');
+  } else if(direction==='down'){
+    rocketEl.classList.remove('going-up');
+    rocketEl.classList.add('going-down');
+    // After landing, flip back to up
+    setTimeout(()=>{
+      rocketEl.classList.remove('going-down');
+      rocketEl.classList.add('going-up');
+    }, 1200);
+  } else {
+    // Init
+    rocketEl.classList.add('going-up');
+  }
+
+  rocketWrap.style.top=(cr.top-sr.top+cr.height/2-20)+'px';
+}
+
+// Mission flow
+function startMission(){
+  document.getElementById('startScreen').style.display='none';
+  document.getElementById('exerciseArea').style.display='flex';
+  currentStep=0; buildPath(); loadStep('init');
+}
+
+function loadStep(direction){
+  currentEx=generateFor(currentStep);
+  renderExercise(); updatePath(direction); updateProgressPills();
+}
+
+function renderExercise(){
+  const cfg=STEPS[currentStep];
+  document.getElementById('challengeName').textContent=`Repte ${currentStep+1}/8 — ${cfg.emoji} ${cfg.label}`;
+  document.getElementById('challengeSub').textContent=
+    cfg.type==='numeric'?'Factor comú numèric':cfg.type==='letter'?'Factor comú de variable':'Factor comú mixt';
+
+  // Polynomial display (with sign colours)
+  const polyEl=document.getElementById('polyExpr');
+  polyEl.innerHTML=currentEx.terms.map((t,i)=>{
+    const mono=monoStr(t.coef,t.exp);
+    if(i===0) return `<span class="tc-pos">${mono}</span>`;
+    const opStr = t.sign>0 ? '+' : '−';
+    const cls   = t.sign>0 ? 'tc-pos' : 'tc-neg';
+    return `<span class="op">${opStr}</span><span class="${cls}">${mono}</span>`;
+  }).join('');
+
+  // Bank
+  const bank=document.getElementById('bank');
+  bank.innerHTML='';
+  currentEx.allPieces.forEach((p,i)=>{
+    const el=createPiece(p.label,i);
+    // detect if sign piece (starts with + or -)
+    if(p.label.startsWith('+')||p.label.startsWith('-')) el.classList.add('sign-piece');
+    bank.appendChild(el);
+  });
+
+  ['zoneFC','zoneTerms'].forEach(id=>{
+    const z=document.getElementById(id);
+    z.querySelectorAll('.piece').forEach(p=>p.remove());
+    z.classList.remove('correct-zone','wrong-zone');
+    updatePlaceholder(z);
+  });
+  document.getElementById('feedback').className='feedback';
+  document.getElementById('continueBtn').style.display='none';
+  document.getElementById('verifyBtn').disabled=false;
+  // Pista: disponible a partir del repte 5 (index 4)
+  const hintBtn = document.getElementById('hintBtn');
+  hintBtn.style.display = currentStep >= 4 ? 'block' : 'none';
+  hintBtn.textContent = '💡 PISTA';
+  hintBtn.classList.remove('active');
+  document.getElementById('hintBox').style.display='none';
+}
+
+function updateProgressPills(){
+  const wrap=document.getElementById('progressPills');
+  wrap.innerHTML=STEPS.map((_,i)=>`<div class="pp${i<currentStep?' done':i===currentStep?' active':''}"></div>`).join('');
+  document.getElementById('topProgress').innerHTML=wrap.innerHTML;
+}
+
+// Pieces & drag
+function createPiece(label,idx){
+  const el=document.createElement('div'); el.className='piece';
+  el.textContent=label; el.dataset.label=label; el.draggable=true;
+  el.addEventListener('dragstart',onDragStart); el.addEventListener('dragend',onDragEnd);
+  el.addEventListener('touchstart',onTouchStart,{passive:false});
+  el.addEventListener('touchmove',onTouchMove,{passive:false});
+  el.addEventListener('touchend',onTouchEnd);
+  return el;
+}
+
+function updatePlaceholder(zone){
+  let ph=zone.querySelector('.placeholder');
+  if(zone.querySelectorAll('.piece').length>0){if(ph)ph.style.display='none';}
+  else{
+    if(!ph){ph=document.createElement('span');ph.className='placeholder';ph.textContent=zone.id==='zoneFC'?'FC':'t ± t …';zone.appendChild(ph);}
+    else ph.style.display='';
+  }
+}
+
+function getZone(el){
+  if(el.closest('#bank')) return 'bank';
+  if(el.closest('#zoneFC')) return 'fc';
+  if(el.closest('#zoneTerms')) return 'terms';
+  return null;
+}
+
+function onDragStart(e){
+  dragPiece=e.currentTarget; dragOrigin=getZone(dragPiece);
+  dragPiece.classList.add('dragging');
+  const g=document.getElementById('dragGhost'); g.textContent=dragPiece.dataset.label; g.style.opacity='1';
+  e.dataTransfer.effectAllowed='move';
+}
+function onDragEnd(){
+  if(dragPiece)dragPiece.classList.remove('dragging');
+  document.getElementById('dragGhost').style.opacity='0';
+  dragPiece=null; dragOrigin=null;
+}
+
+['zoneFC','zoneTerms','bank'].forEach(id=>{
+  const el=document.getElementById(id);
+  el.addEventListener('dragover',e=>{e.preventDefault();el.classList.add('dragover');});
+  el.addEventListener('dragleave',()=>el.classList.remove('dragover'));
+  el.addEventListener('drop',e=>{
+    e.preventDefault(); el.classList.remove('dragover'); if(!dragPiece)return;
+    const to=id==='bank'?'bank':id==='zoneFC'?'fc':'terms';
+    movePiece(dragPiece,dragOrigin,to);
+  });
+});
+
+function movePiece(piece,from,to){
+  if(from===to)return;
+  // FC zone: only 1 piece allowed — swap back to bank
+  if(to==='fc'){
+    document.getElementById('zoneFC').querySelectorAll('.piece').forEach(p=>{
+      document.getElementById('bank').appendChild(p); p.classList.remove('placed');
+    });
+  }
+  const dest=to==='bank'?document.getElementById('bank'):to==='fc'?document.getElementById('zoneFC'):document.getElementById('zoneTerms');
+  dest.appendChild(piece);
+  piece.classList.toggle('placed',to!=='bank');
+  updatePlaceholder(document.getElementById('zoneFC'));
+  updatePlaceholder(document.getElementById('zoneTerms'));
+  updatePlaceholder(document.getElementById('bank'));
+  document.getElementById('feedback').className='feedback';
+  document.getElementById('zoneFC').classList.remove('correct-zone','wrong-zone');
+  document.getElementById('zoneTerms').classList.remove('correct-zone','wrong-zone');
+}
+
+// Touch drag
+function onTouchStart(e){
+  touchPiece=e.currentTarget; touchOrigin=getZone(touchPiece);
+  touchPiece.classList.add('dragging');
+  const t=e.touches[0]; const g=document.getElementById('dragGhost');
+  g.textContent=touchPiece.dataset.label; g.style.left=t.clientX+'px'; g.style.top=t.clientY+'px'; g.style.opacity='1';
+  e.preventDefault();
+}
+function onTouchMove(e){
+  if(!touchPiece)return; const t=e.touches[0];
+  const g=document.getElementById('dragGhost'); g.style.left=t.clientX+'px'; g.style.top=t.clientY+'px';
+  ['zoneFC','zoneTerms','bank'].forEach(id=>{
+    const z=document.getElementById(id),r=z.getBoundingClientRect();
+    z.classList.toggle('dragover',t.clientX>=r.left&&t.clientX<=r.right&&t.clientY>=r.top&&t.clientY<=r.bottom);
+  }); e.preventDefault();
+}
+function onTouchEnd(e){
+  if(!touchPiece)return; const t=e.changedTouches[0];
+  document.getElementById('dragGhost').style.opacity='0'; touchPiece.classList.remove('dragging');
+  ['zoneFC','zoneTerms','bank'].forEach(id=>document.getElementById(id).classList.remove('dragover'));
+  for(const z of [{id:'zoneFC',zone:'fc'},{id:'zoneTerms',zone:'terms'},{id:'bank',zone:'bank'}]){
+    const r=document.getElementById(z.id).getBoundingClientRect();
+    if(t.clientX>=r.left&&t.clientX<=r.right&&t.clientY>=r.top&&t.clientY<=r.bottom){movePiece(touchPiece,touchOrigin,z.zone);break;}
+  }
+  touchPiece=null; touchOrigin=null;
+}
+
+// Verify
+function verify(){
+  const fcPieces   =[...document.getElementById('zoneFC').querySelectorAll('.piece')];
+  const termPieces =[...document.getElementById('zoneTerms').querySelectorAll('.piece')];
+
+  if(fcPieces.length===0||termPieces.length===0){
+    showFeedback('err','⚠️ Falta alguna peça','Col·loca el factor comú i tots els termes del parèntesi.','', null);
+    return;
+  }
+
+  const userFC    = fcPieces.map(p=>p.dataset.label).join('');
+  const userTerms = termPieces.map(p=>p.dataset.label).sort().join(',');
+  const corrTerms = [...currentEx.innerLabels].sort().join(',');
+
+  const fcOk    = userFC === currentEx.fcLabel;
+  const termsOk = userTerms === corrTerms;
+
+  document.getElementById('zoneFC').classList.toggle('correct-zone',fcOk);
+  document.getElementById('zoneFC').classList.toggle('wrong-zone',!fcOk);
+  document.getElementById('zoneTerms').classList.toggle('correct-zone',termsOk);
+  document.getElementById('zoneTerms').classList.toggle('wrong-zone',!termsOk);
+  fcPieces.forEach(p=>{p.classList.toggle('correct',fcOk);p.classList.toggle('wrong',!fcOk);});
+  termPieces.forEach(p=>{p.classList.toggle('correct',termsOk);p.classList.toggle('wrong',!termsOk);});
+  document.getElementById('verifyBtn').disabled=true;
+
+  if(fcOk&&termsOk){
+    showFeedback('ok','✓ Correcte!','Factorització perfecta!',currentEx.answerStr, true);
+  } else {
+    const msg=!fcOk&&!termsOk?'Tant el FC com els termes són incorrectes.'
+             :!fcOk?'El factor comú no és correcte.'
+             :'Els termes del parèntesi no són correctes (comprova signes i exponents).';
+    showFeedback('err','✗ Error!',msg,`Resposta correcta: ${currentEx.answerStr}`, false);
+    const circle=document.getElementById('circle-'+currentStep);
+    circle.style.animation='errFlash 0.5s ease';
+    setTimeout(()=>{circle.style.animation='';},500);
+  }
+}
+
+let pendingResult = null; // 'ok' | 'err'
+
+function toggleHint(){
+  const box = document.getElementById('hintBox');
+  const btn = document.getElementById('hintBtn');
+  if(box.style.display !== 'none'){
+    box.style.display='none';
+    btn.textContent='💡 PISTA';
+    return;
+  }
+
+  // Build hint content based on the exercise
+  const {fc, fcLabel, innerTerms, terms} = currentEx;
+
+  // Step 1: find GCD of coefs
+  const allCoefs = terms.map(t=>t.coef);
+  const gcdCoefs = allCoefs.reduce((a,b)=>gcd(a,b));
+  // Step 2: min exponent
+  const allExps  = terms.map(t=>t.exp);
+  const minExp   = Math.min(...allExps);
+
+  let html = '';
+
+  // Hint 1: how to find the numeric FC
+  html += `<strong style="color:var(--accent)">Pas 1 — Factor numèric:</strong><br>`;
+  html += `Els coeficients són <strong>${allCoefs.join(', ')}</strong>. El seu MCD és <strong style="color:var(--yellow)">${gcdCoefs}</strong>.<br><br>`;
+
+  // Hint 2: variable part
+  if(fc.exp > 0){
+    html += `<strong style="color:var(--accent)">Pas 2 — Factor variable:</strong><br>`;
+    html += `L'exponent més petit de x és <strong style="color:var(--yellow)">${minExp}</strong>, per tant el FC porta x${minExp>1?'<sup>'+minExp+'</sup>':''}.<br><br>`;
+  }
+
+  // Hint 3: FC
+  html += `<strong style="color:var(--accent)">Per tant el Factor Comú és:</strong> <strong style="color:var(--yellow)">${fcLabel}</strong><br><br>`;
+
+  // Hint 4: unit reminder if applicable
+  const hasUnit = innerTerms.some(t=>t.coef===1&&t.exp===0);
+  if(hasUnit){
+    html += `⚠️ Un dels termes dins el parèntesi és <strong style="color:var(--yellow)">1</strong> perquè el FC és igual a un dels sumands originals.`;
+  }
+
+  document.getElementById('hintContent').innerHTML = html;
+  box.style.display='block';
+  btn.textContent='💡 AMAGAR';
+}
+
+function doContinue(){
+  if(pendingResult==='ok') advanceStep();
+  else retreatStep();
+  pendingResult=null;
+}
+
+function advanceStep(){
+  if(currentStep>=STEPS.length-1){showWin();return;}
+  currentStep++; loadStep('up');
+}
+function retreatStep(){
+  if(currentStep>0) currentStep--;
+  loadStep('down');
+}
+
+function showWin(){
+  document.getElementById('exerciseArea').style.display='none';
+  document.getElementById('winScreen').classList.add('visible');
+  for(let i=0;i<50;i++) setTimeout(()=>addBurstStar(),i*50);
+}
+
+function addBurstStar(){
+  const s=document.createElement('div');
+  s.style.cssText=`position:fixed;width:7px;height:7px;border-radius:50%;background:${pick(['#ffd700','#00d4ff','#00ff88','#ff8c00','#ff3d5a'])};left:${Math.random()*100}vw;top:${Math.random()*100}vh;z-index:9999;pointer-events:none;animation:burstFade 1.4s ease forwards`;
+  document.body.appendChild(s); setTimeout(()=>s.remove(),1400);
+}
+const st=document.createElement('style');
+st.textContent='@keyframes burstFade{0%{opacity:1;transform:scale(0)}50%{opacity:1;transform:scale(1.8)}100%{opacity:0;transform:scale(1) translateY(-50px)}}';
+document.head.appendChild(st);
+
+function restartMission(){
+  currentStep=0;
+  document.getElementById('winScreen').classList.remove('visible');
+  document.getElementById('exerciseArea').style.display='flex';
+  buildPath(); loadStep('init');
+}
+
+function showFeedback(type,title,msg,ans,isOk){
+  const fb=document.getElementById('feedback'); fb.className='feedback '+type;
+  document.getElementById('fbTitle').textContent=title;
+  document.getElementById('fbMsg').textContent=msg;
+  document.getElementById('fbAns').textContent=ans;
+  const btn=document.getElementById('continueBtn');
+  if(isOk===null){
+    btn.style.display='none';
+    pendingResult=null;
+  } else {
+    btn.style.display='block';
+    btn.textContent = isOk ? 'CONTINUAR →' : 'HO ENTENC, CONTINUAR →';
+    pendingResult = isOk ? 'ok' : 'err';
+  }
+}
+
+window.addEventListener('resize',positionRocket);
+</script>
+</body>
+</html>
