@@ -168,9 +168,26 @@ body { background:var(--bg0); font-family:'Space Mono',monospace; color:var(--te
   .step-label,.path-title,.rocket-wrap { display:none; }
   .main { padding:14px; }
 }
+  .credit {
+  position: fixed;
+  top: 8px;
+  right: 10px;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--muted);
+  opacity: 0.7;
+  z-index: 9999;
+}
+
+.credit strong {
+  font-weight: bold;
+}
 </style>
 </head>
 <body>
+  <div class="credit">
+  <strong>Dissenyat per:</strong> Eros Robledo
+</div>
 <div class="stars" id="stars"></div>
 <div id="dragGhost"></div>
 
